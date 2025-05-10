@@ -1,0 +1,12 @@
+int x;
+int y;
+read(x);
+read(y);
+int z;
+z = (x + y) * 2 - y / x;
+print(z);
+if (x > y) {
+    print(x);
+} else {
+    print(y);
+}
