@@ -11,11 +11,12 @@
 
 class Parser {
 public:
-    Parser(SymbolTable& sym_table);
+    Parser(SymbolTable& sym_table, bool silent = false);
     std::vector<OPS> parse(const std::vector<Token>& tokens);
 
 private:
     SymbolTable& sym_table;
+    bool silent_mode;
     std::vector<Token> tokens;
     size_t pos;
     std::vector<OPS> ops;

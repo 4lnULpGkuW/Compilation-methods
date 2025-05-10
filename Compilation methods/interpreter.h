@@ -5,17 +5,17 @@
 #include "ops.h"
 #include <stack>
 #include <vector>
-#include <string>
 
 class Interpreter {
 public:
-    Interpreter(SymbolTable& sym_table);
+    Interpreter(SymbolTable& sym_table, bool silent = false);
     void execute(const std::vector<OPS>& ops);
+
 private:
     SymbolTable& sym_table;
-    size_t pc; // Program counter
-    std::stack<int> stack; // Operand stack
-    bool is_number(const std::string& s);
+    bool silent_mode;
+    size_t pc;
+    std::stack<int> stack;
 };
 
 #endif // INTERPRETER_H

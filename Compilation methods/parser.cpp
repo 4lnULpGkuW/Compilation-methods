@@ -2,8 +2,9 @@
 #include <stdexcept>
 #include <iostream>
 #include <set>
+#include <vector>
 
-Parser::Parser(SymbolTable& sym_table) : sym_table(sym_table), pos(0) {}
+Parser::Parser(SymbolTable& sym_table, bool silent) : sym_table(sym_table), pos(0), silent_mode(silent) {}
 
 std::vector<OPS> Parser::parse(const std::vector<Token>& tokens) {
     if (tokens.empty()) {
@@ -17,7 +18,9 @@ std::vector<OPS> Parser::parse(const std::vector<Token>& tokens) {
     label_stack = std::stack<size_t>();
     declared_arrays.clear();
     std::vector<std::string> errors;
-    std::cout << "Starting parse with " << tokens.size() << " tokens\n";
+    if (!silent_mode) {
+        std::cout << "Starting parse with " << tokens.size() << " tokens\n";
+    }
     while (pos < tokens.size() && tokens[pos].type != "EOF") {
         try {
             parseStmt();
@@ -55,9 +58,11 @@ std::vector<OPS> Parser::parse(const std::vector<Token>& tokens) {
         }
     }
     if (errors.empty()) {
-        std::cout << "OPS generated successfully (" << ops.size() << " operations):\n";
-        for (size_t i = 0; i < ops.size(); ++i) {
-            std::cout << i << ": " << ops[i].operation << (ops[i].operand.empty() ? "" : " " + ops[i].operand) << "\n";
+        if (!silent_mode) {
+            std::cout << "OPS generated successfully (" << ops.size() << " operations):\n";
+            for (size_t i = 0; i < ops.size(); ++i) {
+                std::cout << i << ": " << ops[i].operation << (ops[i].operand.empty() ? "" : " " + ops[i].operand) << "\n";
+            }
         }
     }
     else {
@@ -76,13 +81,17 @@ Token Parser::expect(const std::string& type, const std::string& value) {
             "') at line " + std::to_string(tokens[pos].line) +
             ", position " + std::to_string(tokens[pos].pos));
     }
-    std::cout << "Expected " << type << (value.empty() ? "" : " '" + value + "'") << ", got " << tokens[pos].value << "\n";
+    if (!silent_mode) {
+        std::cout << "Expected " << type << (value.empty() ? "" : " '" + value + "'") << ", got " << tokens[pos].value << "\n";
+    }
     return tokens[pos++];
 }
 
 bool Parser::match(const std::string& type, const std::string& value) {
     if (pos < tokens.size() && tokens[pos].type == type && (value.empty() || tokens[pos].value == value)) {
-        std::cout << "Matched " << type << (value.empty() ? "" : " '" + value + "'") << ": " << tokens[pos].value << "\n";
+        if (!silent_mode) {
+            std::cout << "Matched " << type << (value.empty() ? "" : " '" + value + "'") << ": " << tokens[pos].value << "\n";
+        }
         pos++;
         return true;
     }
@@ -90,19 +99,23 @@ bool Parser::match(const std::string& type, const std::string& value) {
 }
 
 void Parser::parseProgram() {
-    std::cout << "Parsing Program at pos " << pos << "\n";
+    if (!silent_mode) {
+        std::cout << "Parsing Program at pos " << pos << "\n";
+    }
     while (pos < tokens.size() && tokens[pos].type != "EOF" && !(tokens[pos].type == "SYMBOL" && tokens[pos].value == "}")) {
         parseStmt();
     }
 }
 
 void Parser::parseStmt() {
-    std::cout << "Parsing Stmt at pos " << pos;
-    if (pos < tokens.size()) {
-        std::cout << " (token: " << tokens[pos].type << " '" << tokens[pos].value << "')\n";
-    }
-    else {
-        std::cout << " (end of input)\n";
+    if (!silent_mode) {
+        std::cout << "Parsing Stmt at pos " << pos;
+        if (pos < tokens.size()) {
+            std::cout << " (token: " << tokens[pos].type << " '" << tokens[pos].value << "')\n";
+        }
+        else {
+            std::cout << " (end of input)\n";
+        }
     }
     if (pos >= tokens.size() || (tokens[pos].type == "SYMBOL" && tokens[pos].value == "}")) {
         pos++;
@@ -189,7 +202,9 @@ void Parser::parseStmt() {
 }
 
 void Parser::parseDeclInt() {
-    std::cout << "Parsing DeclInt\n";
+    if (!silent_mode) {
+        std::cout << "Parsing DeclInt\n";
+    }
     std::string id = expect("ID").value;
     if (sym_table.exists(id) || declared_arrays.find(id) != declared_arrays.end()) {
         throw std::runtime_error("Variable or array '" + id + "' already declared at line " +
@@ -198,7 +213,9 @@ void Parser::parseDeclInt() {
     }
     if (match("SYMBOL", ";")) {
         sym_table.add_variable(id, 0);
-        std::cout << "Added variable to sym_table: " << id << "\n";
+        if (!silent_mode) {
+            std::cout << "Added variable to sym_table: " << id << "\n";
+        }
     }
     else if (match("SYMBOL", "=")) {
         parseExpr();
@@ -246,7 +263,9 @@ void Parser::parseDeclInt() {
 }
 
 void Parser::parseUseInt() {
-    std::cout << "Parsing UseInt\n";
+    if (!silent_mode) {
+        std::cout << "Parsing UseInt\n";
+    }
     std::string id = expect("ID").value;
     if (!sym_table.exists(id) && declared_arrays.find(id) == declared_arrays.end()) {
         throw std::runtime_error("Undefined variable or array '" + id + "' at line " +
@@ -297,7 +316,9 @@ void Parser::parseInitCont() {
 }
 
 void Parser::parseExpr() {
-    std::cout << "Parsing Expr\n";
+    if (!silent_mode) {
+        std::cout << "Parsing Expr\n";
+    }
     parseTerm();
     parseExprCont();
 }
@@ -334,7 +355,9 @@ void Parser::parseTermCont() {
 }
 
 void Parser::parseFactor() {
-    std::cout << "Parsing Factor\n";
+    if (!silent_mode) {
+        std::cout << "Parsing Factor\n";
+    }
     if (pos < tokens.size() && tokens[pos].type == "ID") {
         std::string id = expect("ID").value;
         if (!sym_table.exists(id) && declared_arrays.find(id) == declared_arrays.end()) {
@@ -371,7 +394,9 @@ void Parser::parseFactor() {
 }
 
 size_t Parser::parseLogExpr() {
-    std::cout << "Parsing LogExpr\n";
+    if (!silent_mode) {
+        std::cout << "Parsing LogExpr\n";
+    }
     if (match("SYMBOL", "!")) {
         size_t jf_pos = parseLogExpr();
         add_ops("!");
@@ -394,7 +419,9 @@ size_t Parser::parseLogExpr() {
 }
 
 size_t Parser::parseLogCmp(std::vector<OPS>& left_ops) {
-    std::cout << "Parsing LogCmp\n";
+    if (!silent_mode) {
+        std::cout << "Parsing LogCmp\n";
+    }
     if (match("SYMBOL", ">")) {
         std::vector<OPS> right_ops;
         size_t start_pos = ops.size();
@@ -450,7 +477,9 @@ void Parser::parseLogCont() {
 
 void Parser::add_ops(const std::string& operation, const std::string& operand) {
     ops.emplace_back(operation, operand);
-    std::cout << "Added OPS: " << operation << (operand.empty() ? "" : " " + operand) << "\n";
+    if (!silent_mode) {
+        std::cout << "Added OPS: " << operation << (operand.empty() ? "" : " " + operand) << "\n";
+    }
 }
 
 void Parser::push_label(size_t pos) {
@@ -469,6 +498,8 @@ size_t Parser::pop_label() {
 void Parser::set_jump(size_t label_pos, size_t target) {
     if (label_pos < ops.size() && label_pos != std::numeric_limits<size_t>::max()) {
         ops[label_pos].operand = std::to_string(target);
-        std::cout << "Set jump at " << label_pos << " to " << target << "\n";
+        if (!silent_mode) {
+            std::cout << "Set jump at " << label_pos << " to " << target << "\n";
+        }
     }
 }

@@ -7,7 +7,7 @@
 
 class Lexer {
 public:
-    Lexer(const std::string& input);
+    Lexer(const std::string& input, bool silent = false);
     std::vector<Token> tokenize();
 
 private:
@@ -15,6 +15,7 @@ private:
     size_t pos;
     int line;
     int line_pos;
+    bool silent_mode;
 };
 
 #endif // LEXER_H
