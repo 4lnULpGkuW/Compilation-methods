@@ -11,11 +11,10 @@ class Interpreter {
 public:
     Interpreter(SymbolTable& sym_table);
     void execute(const std::vector<OPS>& ops);
+    void set_silent_mode(bool mode); // Новый метод
 private:
     SymbolTable& sym_table;
-    size_t pc; // Program counter
-    std::stack<int> stack; // Operand stack
-    bool is_number(const std::string& s);
+    bool silent_mode_active; // Флаг для интерпретатора
 };
 
-#endif // INTERPRETER_H
+#endif

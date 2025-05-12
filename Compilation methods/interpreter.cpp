@@ -4,22 +4,30 @@
 #include <algorithm> 
 #include <limits> 
 
-Interpreter::Interpreter(SymbolTable& sym_table) : sym_table(sym_table) {}
+Interpreter::Interpreter(SymbolTable& sym_table) : sym_table(sym_table), silent_mode_active(false) {}
 
-void Interpreter::execute(const std::vector<OPS>& ops) {
+void Interpreter::set_silent_mode(bool mode) {
+    silent_mode_active = mode;
+}
+
+void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал ops в ops_list
     std::stack<int> stack;
     size_t pc = 0;
 
-    std::cout << "Symbol table before execution:\n";
-    sym_table.print();
+    if (!silent_mode_active) {
+        std::cout << "Symbol table before execution:\n";
+        sym_table.print();
+    }
 
-    while (pc < ops.size()) {
-        const OPS& op = ops[pc];
-        std::cout << "Executing op " << pc << ": " << op.operation << (op.operand.empty() ? "" : " " + op.operand) << "\n";
+    while (pc < ops_list.size()) {
+        const OPS& op = ops_list[pc];
+        if (!silent_mode_active) {
+            std::cout << "Executing op " << pc << ": " << op.operation << (op.operand.empty() ? "" : " " + op.operand) << "\n";
+        }
 
         if (op.operation == "r") {
             int value;
-            std::cout << "Enter value for " << op.operand << ": ";
+            std::cout << "Enter value for " << op.operand << ": "; // Оставляем этот вывод
             std::cin >> value;
             if (std::cin.fail()) {
                 std::cin.clear();
@@ -27,14 +35,17 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
                 throw std::runtime_error("Invalid input for read operation");
             }
             sym_table.set_variable(op.operand, value);
-            std::cout << "Read " << value << " into " << op.operand << "\n";
+            if (!silent_mode_active) {
+                std::cout << "Read " << value << " into " << op.operand << "\n";
+            }
         }
         else if (op.operation == "") {
+            // ... (логика без изменений, но с if (!silent_mode_active) для cout)
             if (sym_table.exists(op.operand)) {
                 try {
                     int value = sym_table.get_variable(op.operand);
                     stack.push(value);
-                    std::cout << "Pushed variable " << op.operand << ": " << value << "\n";
+                    if (!silent_mode_active) std::cout << "Pushed variable " << op.operand << ": " << value << "\n";
                 }
                 catch (const std::runtime_error& e) {
                     throw std::runtime_error("Operand " + op.operand + " is likely an array used as a variable, or not found. Details: " + e.what());
@@ -44,7 +55,7 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
                 try {
                     int value = std::stoi(op.operand);
                     stack.push(value);
-                    std::cout << "Pushed number: " << value << "\n";
+                    if (!silent_mode_active) std::cout << "Pushed number: " << value << "\n";
                 }
                 catch (const std::invalid_argument& ia) {
                     throw std::runtime_error("Invalid number for push: " + op.operand);
@@ -54,26 +65,31 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
                 }
             }
         }
+        // ... Аналогично для всех остальных операций ...
+        // Пример для '+'
         else if (op.operation == "+") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for + operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
             int left = stack.top(); stack.pop();
             stack.push(left + right);
-            std::cout << "Computed " << left << " + " << right << " = " << (left + right) << "\n";
+            if (!silent_mode_active) {
+                std::cout << "Computed " << left << " + " << right << " = " << (left + right) << "\n";
+            }
         }
+        // ... (и так далее для -, *, /, ~, >, <, ==, &, |, !) ...
         else if (op.operation == "-") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for - operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
             int left = stack.top(); stack.pop();
             stack.push(left - right);
-            std::cout << "Computed " << left << " - " << right << " = " << (left - right) << "\n";
+            if (!silent_mode_active) std::cout << "Computed " << left << " - " << right << " = " << (left - right) << "\n";
         }
         else if (op.operation == "*") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for * operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
             int left = stack.top(); stack.pop();
             stack.push(left * right);
-            std::cout << "Computed " << left << " * " << right << " = " << (left * right) << "\n";
+            if (!silent_mode_active) std::cout << "Computed " << left << " * " << right << " = " << (left * right) << "\n";
         }
         else if (op.operation == "/") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for / operation at pc " + std::to_string(pc));
@@ -81,60 +97,63 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
             int left = stack.top(); stack.pop();
             if (right == 0) throw std::runtime_error("Division by zero at pc " + std::to_string(pc));
             stack.push(left / right);
-            std::cout << "Computed " << left << " / " << right << " = " << (left / right) << "\n";
+            if (!silent_mode_active) std::cout << "Computed " << left << " / " << right << " = " << (left / right) << "\n";
         }
         else if (op.operation == "~") {
             if (stack.empty()) throw std::runtime_error("Stack underflow for ~ operation at pc " + std::to_string(pc));
             int val = stack.top(); stack.pop();
             stack.push(-val);
-            std::cout << "Computed ~" << val << " = " << (-val) << "\n";
+            if (!silent_mode_active) std::cout << "Computed ~" << val << " = " << (-val) << "\n";
         }
         else if (op.operation == ">") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for > operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
             int left = stack.top(); stack.pop();
             stack.push(left > right ? 1 : 0);
-            std::cout << "Computed " << left << " > " << right << " = " << (left > right ? 1 : 0) << "\n";
+            if (!silent_mode_active) std::cout << "Computed " << left << " > " << right << " = " << (left > right ? 1 : 0) << "\n";
         }
         else if (op.operation == "<") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for < operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
             int left = stack.top(); stack.pop();
             stack.push(left < right ? 1 : 0);
-            std::cout << "Computed " << left << " < " << right << " = " << (left < right ? 1 : 0) << "\n";
+            if (!silent_mode_active) std::cout << "Computed " << left << " < " << right << " = " << (left < right ? 1 : 0) << "\n";
         }
         else if (op.operation == "==") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for == operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
             int left = stack.top(); stack.pop();
             stack.push(left == right ? 1 : 0);
-            std::cout << "Computed " << left << " == " << right << " = " << (left == right ? 1 : 0) << "\n";
+            if (!silent_mode_active) std::cout << "Computed " << left << " == " << right << " = " << (left == right ? 1 : 0) << "\n";
         }
         else if (op.operation == "&") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for & operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
             int left = stack.top(); stack.pop();
             stack.push((left != 0) && (right != 0) ? 1 : 0);
-            std::cout << "Computed " << left << " & " << right << " = " << ((left != 0) && (right != 0) ? 1 : 0) << "\n";
+            if (!silent_mode_active) std::cout << "Computed " << left << " & " << right << " = " << ((left != 0) && (right != 0) ? 1 : 0) << "\n";
         }
         else if (op.operation == "|") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for | operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
             int left = stack.top(); stack.pop();
             stack.push((left != 0) || (right != 0) ? 1 : 0);
-            std::cout << "Computed " << left << " | " << right << " = " << ((left != 0) || (right != 0) ? 1 : 0) << "\n";
+            if (!silent_mode_active) std::cout << "Computed " << left << " | " << right << " = " << ((left != 0) || (right != 0) ? 1 : 0) << "\n";
         }
         else if (op.operation == "!") {
             if (stack.empty()) throw std::runtime_error("Stack underflow for ! operation at pc " + std::to_string(pc));
             int val = stack.top(); stack.pop();
             stack.push(val == 0 ? 1 : 0);
-            std::cout << "Computed !" << val << " = " << (val == 0 ? 1 : 0) << "\n";
+            if (!silent_mode_active) std::cout << "Computed !" << val << " = " << (val == 0 ? 1 : 0) << "\n";
         }
+
         else if (op.operation == "jf") {
             if (op.operand.empty()) throw std::runtime_error("jf missing target operand at pc " + std::to_string(pc));
             if (stack.empty()) throw std::runtime_error("Stack underflow for jf condition at pc " + std::to_string(pc));
             int condition = stack.top(); stack.pop();
-            std::cout << "jf condition: " << condition << ", target: " << op.operand << "\n";
+            if (!silent_mode_active) {
+                std::cout << "jf condition: " << condition << ", target: " << op.operand << "\n";
+            }
             if (condition == 0) {
                 try {
                     pc = std::stoul(op.operand);
@@ -145,7 +164,9 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
                 catch (const std::out_of_range& oor) {
                     throw std::runtime_error("Target out of range for jf: " + op.operand + " at pc " + std::to_string(pc - 1));
                 }
-                std::cout << "Jumping to " << pc << "\n";
+                if (!silent_mode_active) {
+                    std::cout << "Jumping to " << pc << "\n";
+                }
                 continue;
             }
         }
@@ -160,21 +181,27 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
             catch (const std::out_of_range& oor) {
                 throw std::runtime_error("Target out of range for j: " + op.operand + " at pc " + std::to_string(pc - 1));
             }
-            std::cout << "Jumping to " << pc << "\n";
+            if (!silent_mode_active) {
+                std::cout << "Jumping to " << pc << "\n";
+            }
             continue;
         }
         else if (op.operation == "=") {
             if (stack.empty()) throw std::runtime_error("Stack underflow for = operation (value) at pc " + std::to_string(pc));
             int value = stack.top(); stack.pop();
             sym_table.set_variable(op.operand, value);
-            std::cout << "Set " << op.operand << " = " << value << "\n";
+            if (!silent_mode_active) {
+                std::cout << "Set " << op.operand << " = " << value << "\n";
+            }
         }
         else if (op.operation == "alloc_array") {
             if (stack.empty()) throw std::runtime_error("Stack underflow for alloc_array size at pc " + std::to_string(pc));
             int size = stack.top(); stack.pop();
             if (size <= 0) throw std::runtime_error("Invalid array size: " + std::to_string(size) + " for array " + op.operand + " at pc " + std::to_string(pc));
             sym_table.add_array(op.operand, size);
-            std::cout << "Allocated array " << op.operand << " of size " << size << "\n";
+            if (!silent_mode_active) {
+                std::cout << "Allocated array " << op.operand << " of size " << size << "\n";
+            }
         }
         else if (op.operation == "init_array") {
             int num_initializers = 0;
@@ -201,8 +228,8 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
 
             int search_k_limit = static_cast<int>(pc) - 1;
             for (int k = search_k_limit; k >= 0; --k) {
-                if (ops[k].operation == "alloc_array") {
-                    array_name = ops[k].operand;
+                if (k < static_cast<int>(ops_list.size()) && ops_list[k].operation == "alloc_array") { // Проверка границ k
+                    array_name = ops_list[k].operand;
                     found_alloc = true;
                     break;
                 }
@@ -218,13 +245,15 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
             for (int i = 0; i < num_initializers; ++i) {
                 arr[i] = initial_values[i];
             }
-            std::cout << "Initialized array " << array_name << " with " << num_initializers << " values\n";
+            if (!silent_mode_active) {
+                std::cout << "Initialized array " << array_name << " with " << num_initializers << " values\n";
+            }
         }
         else if (op.operation == "array_read") {
             if (stack.empty()) throw std::runtime_error("Stack underflow for array_read index at pc " + std::to_string(pc));
             int index = stack.top(); stack.pop();
             int value;
-            std::cout << "Enter value for " << op.operand << "[" << index << "]: ";
+            std::cout << "Enter value for " << op.operand << "[" << index << "]: "; // Оставляем этот вывод
             std::cin >> value;
             if (std::cin.fail()) {
                 std::cin.clear();
@@ -232,7 +261,9 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
                 throw std::runtime_error("Invalid input for array_read operation");
             }
             sym_table.set_array_element(op.operand, index, value);
-            std::cout << "Read " << value << " into " << op.operand << "[" << index << "]\n";
+            if (!silent_mode_active) {
+                std::cout << "Read " << value << " into " << op.operand << "[" << index << "]\n";
+            }
         }
         else if (op.operation == "array_get") {
             if (stack.empty()) throw std::runtime_error("Stack underflow for array_get index at pc " + std::to_string(pc));
@@ -242,25 +273,31 @@ void Interpreter::execute(const std::vector<OPS>& ops) {
                 throw std::runtime_error("Array index out of bounds: " + std::to_string(index) + " for array " + op.operand + " of size " + std::to_string(arr.size()) + " at pc " + std::to_string(pc));
             }
             stack.push(arr[index]);
-            std::cout << "Pushed " << op.operand << "[" << index << "] = " << arr[index] << "\n";
+            if (!silent_mode_active) {
+                std::cout << "Pushed " << op.operand << "[" << index << "] = " << arr[index] << "\n";
+            }
         }
         else if (op.operation == "array_set") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for array_set operation (value or index missing) at pc " + std::to_string(pc));
             int value = stack.top(); stack.pop();
             int index = stack.top(); stack.pop();
             sym_table.set_array_element(op.operand, index, value);
-            std::cout << "Set " << op.operand << "[" << index << "] = " << value << "\n";
+            if (!silent_mode_active) {
+                std::cout << "Set " << op.operand << "[" << index << "] = " << value << "\n";
+            }
         }
         else if (op.operation == "w") {
             if (stack.empty()) throw std::runtime_error("Stack is empty for 'w' operation at pc " + std::to_string(pc));
             int value = stack.top(); stack.pop();
-            std::cout << "Output: " << value << "\n";
+            std::cout << "Output: " << value << "\n"; // Оставляем этот вывод
         }
         else {
             throw std::runtime_error("Unknown operation: " + op.operation + " at pc " + std::to_string(pc));
         }
         pc++;
     }
-    std::cout << "Execution finished. Symbol table final state:\n";
-    sym_table.print();
+    if (!silent_mode_active) {
+        std::cout << "Execution finished. Symbol table final state:\n";
+        sym_table.print();
+    }
 }

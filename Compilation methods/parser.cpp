@@ -5,18 +5,26 @@
 #include <limits>
 #include <algorithm>
 
-Parser::Parser(SymbolTable& sym_table) : sym_table(sym_table), pos(0) {}
+Parser::Parser(SymbolTable& sym_table) : sym_table(sym_table), pos(0), silent_mode_active(false) {}
+
+void Parser::set_silent_mode(bool mode) {
+    silent_mode_active = mode;
+}
 
 std::vector<OPS> Parser::parse(const std::vector<Token>& tokens) {
     if (tokens.empty()) {
+        std::cerr << "Error: Token list is empty\n";
         return std::vector<OPS>();
     }
     this->tokens = tokens;
     pos = 0;
-    ops.clear();
+    ops_list.clear(); // Используем ops_list
     label_stack = std::stack<size_t>();
     declared_arrays.clear();
     std::vector<std::string> errors;
+    if (!silent_mode_active) {
+        std::cout << "Starting parse with " << tokens.size() << " tokens\n";
+    }
     while (pos < tokens.size() && tokens[pos].type != "EOF") {
         try {
             parseStmt();
@@ -44,12 +52,17 @@ std::vector<OPS> Parser::parse(const std::vector<Token>& tokens) {
         }
     }
     if (errors.empty()) {
-        for (size_t i = 0; i < ops.size(); ++i) {
+        if (!silent_mode_active) {
+            std::cout << "OPS generated successfully (" << ops_list.size() << " operations):\n";
+            for (size_t i = 0; i < ops_list.size(); ++i) {
+                std::cout << i << ": " << ops_list[i].operation << (ops_list[i].operand.empty() ? "" : " " + ops_list[i].operand) << "\n";
+            }
         }
     }
     else {
+        std::cerr << "Parsing failed with " << errors.size() << " errors\n";
     }
-    return ops;
+    return ops_list; // Возвращаем ops_list
 }
 
 Token Parser::expect(const std::string& type, const std::string& value) {
@@ -62,11 +75,17 @@ Token Parser::expect(const std::string& type, const std::string& value) {
             "') at line " + std::to_string(tokens[pos].line) +
             ", position " + std::to_string(tokens[pos].pos));
     }
+    if (!silent_mode_active) {
+        std::cout << "Expected " << type << (value.empty() ? "" : " '" + value + "'") << ", got " << tokens[pos].value << "\n";
+    }
     return tokens[pos++];
 }
 
 bool Parser::match(const std::string& type, const std::string& value) {
     if (pos < tokens.size() && tokens[pos].type == type && (value.empty() || tokens[pos].value == value)) {
+        if (!silent_mode_active) {
+            std::cout << "Matched " << type << (value.empty() ? "" : " '" + value + "'") << ": " << tokens[pos].value << "\n";
+        }
         pos++;
         return true;
     }
@@ -74,15 +93,28 @@ bool Parser::match(const std::string& type, const std::string& value) {
 }
 
 void Parser::parseProgram() {
+    if (!silent_mode_active) {
+        std::cout << "Parsing Program at pos " << pos << "\n";
+    }
     while (pos < tokens.size() && tokens[pos].type != "EOF" && !(tokens[pos].type == "SYMBOL" && tokens[pos].value == "}")) {
         parseStmt();
     }
 }
 
 void Parser::parseStmt() {
-    if (pos >= tokens.size() || (tokens[pos].type == "SYMBOL" && tokens[pos].value == "}")) {
+    if (!silent_mode_active) {
+        std::cout << "Parsing Stmt at pos " << pos;
+        if (pos < tokens.size()) {
+            std::cout << " (token: " << tokens[pos].type << " '" << tokens[pos].value << "')\n";
+        }
+        else {
+            std::cout << " (end of input)\n";
+        }
+    }
+    if (pos >= tokens.size() || (pos < tokens.size() && tokens[pos].type == "SYMBOL" && tokens[pos].value == "}")) {
         return;
     }
+
 
     if (tokens[pos].type == "KEYWORD" && tokens[pos].value == "int") {
         match("KEYWORD", "int");
@@ -98,7 +130,7 @@ void Parser::parseStmt() {
         expect("SYMBOL", ")");
 
         add_ops("jf", "");
-        size_t jf_pos = ops.size() - 1;
+        size_t jf_pos = ops_list.size() - 1;
 
         expect("SYMBOL", "{");
         parseProgram();
@@ -107,33 +139,33 @@ void Parser::parseStmt() {
         if (pos < tokens.size() && tokens[pos].type == "KEYWORD" && tokens[pos].value == "else") {
             match("KEYWORD", "else");
             add_ops("j", "");
-            size_t j_else_skip_pos = ops.size() - 1;
-            set_jump(jf_pos, ops.size());
+            size_t j_else_skip_pos = ops_list.size() - 1;
+            set_jump(jf_pos, ops_list.size());
 
             expect("SYMBOL", "{");
             parseProgram();
             expect("SYMBOL", "}");
-            set_jump(j_else_skip_pos, ops.size());
+            set_jump(j_else_skip_pos, ops_list.size());
         }
         else {
-            set_jump(jf_pos, ops.size());
+            set_jump(jf_pos, ops_list.size());
         }
     }
     else if (tokens[pos].type == "KEYWORD" && tokens[pos].value == "while") {
         match("KEYWORD", "while");
-        size_t loop_start = ops.size();
+        size_t loop_start = ops_list.size();
         expect("SYMBOL", "(");
         parseLogExpr();
         expect("SYMBOL", ")");
 
         add_ops("jf", "");
-        size_t jf_pos = ops.size() - 1;
+        size_t jf_pos = ops_list.size() - 1;
 
         expect("SYMBOL", "{");
         parseProgram();
         expect("SYMBOL", "}");
         add_ops("j", std::to_string(loop_start));
-        set_jump(jf_pos, ops.size());
+        set_jump(jf_pos, ops_list.size());
     }
     else if (tokens[pos].type == "KEYWORD" && tokens[pos].value == "read") {
         match("KEYWORD", "read");
@@ -167,15 +199,19 @@ void Parser::parseStmt() {
         return;
     }
     else {
+        if (pos >= tokens.size()) throw std::runtime_error("Unexpected end of input in parseStmt");
         throw std::runtime_error("Invalid statement at line " +
-            std::to_string(pos < tokens.size() ? tokens[pos].line : 0) +
+            std::to_string(tokens[pos].line) +
             ", position " +
-            std::to_string(pos < tokens.size() ? tokens[pos].pos : 0) +
-            " (token: " + (pos < tokens.size() ? tokens[pos].type + " '" + tokens[pos].value + "'" : "EOF") + ")");
+            std::to_string(tokens[pos].pos) +
+            " (token: " + tokens[pos].type + " '" + tokens[pos].value + "')");
     }
 }
 
 void Parser::parseDeclInt() {
+    if (!silent_mode_active) {
+        std::cout << "Parsing DeclInt\n";
+    }
     std::string id = expect("ID").value;
     if (sym_table.exists(id) || declared_arrays.find(id) != declared_arrays.end()) {
         throw std::runtime_error("Variable or array '" + id + "' already declared at line " +
@@ -184,6 +220,9 @@ void Parser::parseDeclInt() {
     }
     if (match("SYMBOL", ";")) {
         sym_table.add_variable(id, 0);
+        if (!silent_mode_active) {
+            std::cout << "Added variable to sym_table: " << id << "\n";
+        }
     }
     else if (match("SYMBOL", "=")) {
         parseExpr();
@@ -207,6 +246,7 @@ void Parser::parseDeclInt() {
             add_ops("", size_val);
         }
         else {
+            if (pos >= tokens.size()) throw std::runtime_error("Unexpected EOF while expecting array size");
             throw std::runtime_error("Expected ID or NUMBER for array size at line " +
                 std::to_string(tokens[pos].line) + ", position " +
                 std::to_string(tokens[pos].pos));
@@ -227,6 +267,7 @@ void Parser::parseDeclInt() {
         }
     }
     else {
+        if (pos >= tokens.size()) throw std::runtime_error("Unexpected EOF after int declaration for " + id);
         throw std::runtime_error("Expected ';', '=', or '[' after identifier '" + id +
             "' at line " + std::to_string(tokens[pos].line) +
             ", position " + std::to_string(tokens[pos].pos));
@@ -234,6 +275,9 @@ void Parser::parseDeclInt() {
 }
 
 void Parser::parseUseInt() {
+    if (!silent_mode_active) {
+        std::cout << "Parsing UseInt\n";
+    }
     std::string id = expect("ID").value;
     if (!sym_table.exists(id) && declared_arrays.find(id) == declared_arrays.end()) {
         throw std::runtime_error("Undefined variable or array '" + id + "' at line " +
@@ -254,6 +298,7 @@ void Parser::parseUseInt() {
         expect("SYMBOL", ";");
     }
     else {
+        if (pos >= tokens.size()) throw std::runtime_error("Unexpected EOF after identifier " + id);
         throw std::runtime_error("Expected '=' or '[' after identifier '" + id +
             "' at line " + std::to_string(tokens[pos].line) +
             ", position " + std::to_string(tokens[pos].pos));
@@ -261,6 +306,9 @@ void Parser::parseUseInt() {
 }
 
 void Parser::parseInitializers(int& count) {
+    if (!silent_mode_active) {
+        std::cout << "Parsing Initializers\n";
+    }
     if (pos < tokens.size() && !(tokens[pos].type == "SYMBOL" && tokens[pos].value == "}")) {
         parseFactor();
         count++;
@@ -277,7 +325,7 @@ void Parser::parseInitCont(int& count) {
         }
         else if (pos < tokens.size() && tokens[pos].type == "SYMBOL" && tokens[pos].value == "}") {
         }
-        else if (pos >= tokens.size() || (tokens[pos].type == "SYMBOL" && tokens[pos].value != "}")) {
+        else if (pos >= tokens.size() || (pos < tokens.size() && tokens[pos].type == "SYMBOL" && tokens[pos].value != "}")) {
             throw std::runtime_error("Expected expression or '}' after comma in initializer list at line " +
                 std::to_string(tokens[pos - 1].line) + ", position " + std::to_string(tokens[pos - 1].pos));
         }
@@ -285,6 +333,9 @@ void Parser::parseInitCont(int& count) {
 }
 
 void Parser::parseExpr() {
+    if (!silent_mode_active) {
+        std::cout << "Parsing Expr\n";
+    }
     parseTerm();
     parseExprCont();
 }
@@ -313,6 +364,9 @@ void Parser::parseTermCont() {
 }
 
 void Parser::parseFactor() {
+    if (!silent_mode_active) {
+        std::cout << "Parsing Factor\n";
+    }
     if (pos < tokens.size() && tokens[pos].type == "ID") {
         std::string id = expect("ID").value;
         if (!sym_table.exists(id) && declared_arrays.find(id) == declared_arrays.end()) {
@@ -341,14 +395,17 @@ void Parser::parseFactor() {
         add_ops("~");
     }
     else {
+        if (pos >= tokens.size()) throw std::runtime_error("Unexpected EOF in parseFactor");
         throw std::runtime_error("Invalid factor at line " +
-            std::to_string(pos < tokens.size() ? tokens[pos].line : 0) +
-            ", position " +
-            std::to_string(pos < tokens.size() ? tokens[pos].pos : 0));
+            std::to_string(tokens[pos].line) +
+            ", position " + std::to_string(tokens[pos].pos));
     }
 }
 
 void Parser::parseLogExpr() {
+    if (!silent_mode_active) {
+        std::cout << "Parsing LogExpr\n";
+    }
     parseLogAndTerm();
     while (pos < tokens.size() && tokens[pos].type == "SYMBOL" && tokens[pos].value == "|") {
         match("SYMBOL", "|");
@@ -387,7 +444,10 @@ void Parser::parseLogNotTerm() {
 }
 
 void Parser::add_ops(const std::string& operation, const std::string& operand) {
-    ops.emplace_back(operation, operand);
+    ops_list.emplace_back(operation, operand); // Используем ops_list
+    if (!silent_mode_active) {
+        std::cout << "Added OPS: " << operation << (operand.empty() ? "" : " " + operand) << "\n";
+    }
 }
 
 void Parser::push_label(size_t p) {
@@ -404,15 +464,27 @@ size_t Parser::pop_label() {
 }
 
 void Parser::set_jump(size_t label_pos, size_t target) {
-    if (label_pos < ops.size() && label_pos != std::numeric_limits<size_t>::max()) {
-        if (ops[label_pos].operation == "jf" || ops[label_pos].operation == "j") {
-            ops[label_pos].operand = std::to_string(target);
+    if (label_pos < ops_list.size() && label_pos != std::numeric_limits<size_t>::max()) { // Используем ops_list
+        if (ops_list[label_pos].operation == "jf" || ops_list[label_pos].operation == "j") {
+            ops_list[label_pos].operand = std::to_string(target);
+            if (!silent_mode_active) {
+                std::cout << "Set jump at " << label_pos << " to " << target << "\n";
+            }
         }
         else {
+            if (!silent_mode_active) {
+                std::cerr << "Warning: Attempted to set_jump on non-jump instruction at " << label_pos << " (op: " << ops_list[label_pos].operation << ")\n";
+            }
         }
     }
     else if (label_pos == std::numeric_limits<size_t>::max()) {
+        if (!silent_mode_active) {
+            std::cout << "Note: Attempted to set_jump on invalid label_pos (max_size_t), possibly no jump needed for an already resolved value.\n";
+        }
     }
     else {
+        if (!silent_mode_active) {
+            std::cerr << "Warning: Attempted to set_jump on out-of-bounds label_pos " << label_pos << "\n";
+        }
     }
 }
