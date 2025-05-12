@@ -8,15 +8,15 @@
 #include <string>
 #include <stack>
 #include <set>
+#include <limits> // Для std::numeric_limits
 
 class Parser {
 public:
-    Parser(SymbolTable& sym_table, bool silent = false);
+    Parser(SymbolTable& sym_table);
     std::vector<OPS> parse(const std::vector<Token>& tokens);
 
 private:
     SymbolTable& sym_table;
-    bool silent_mode;
     std::vector<Token> tokens;
     size_t pos;
     std::vector<OPS> ops;
@@ -30,19 +30,23 @@ private:
     void parseStmt();
     void parseDeclInt();
     void parseUseInt();
-    void parseAlternative();
-    void parseInitializers();
-    void parseInitCont();
+    void parseInitializers(int& count); // Добавили параметр count
+    void parseInitCont(int& count);   // Добавили параметр count
     void parseExpr();
     void parseExprCont();
     void parseTerm();
     void parseTermCont();
     void parseFactor();
-    size_t parseLogExpr();
-    size_t parseLogCmp(std::vector<OPS>& left_ops);
-    void parseLogCont();
+
+    void parseLogExpr();      // Существующий, но теперь вызывает parseLogOrCont
+    void parseLogOrCont();    // Новый метод
+    void parseLogAndTerm();   // Новый метод
+    void parseLogAndCont();   // Новый метод
+    void parseLogNotTerm();   // Новый метод
+    // parseLogCmp больше не нужен в том виде, как был, его логика интегрирована/заменена
+
     void add_ops(const std::string& operation, const std::string& operand = "");
-    void push_label(size_t pos);
+    void push_label(size_t p);
     size_t pop_label();
     void set_jump(size_t label_pos, size_t target);
 };

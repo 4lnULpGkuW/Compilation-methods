@@ -19,6 +19,8 @@ public:
     const std::map<std::string, int>& get_variables() const;
     void clear();
     void print() const; // Added print method
+    std::vector<int>* get_array_maybe(const std::string& name); // Non-const version for modification
+    const std::vector<int>* get_array_maybe(const std::string& name) const; // Const version
 
 private:
     std::map<std::string, int> variables;

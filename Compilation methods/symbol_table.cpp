@@ -74,3 +74,19 @@ void SymbolTable::print() const {
         std::cout << "Array: " << arr.first << ", Size: " << arr.second.size() << "\n";
     }
 }
+
+std::vector<int>* SymbolTable::get_array_maybe(const std::string& name) {
+    auto it = arrays.find(name);
+    if (it == arrays.end()) {
+        return nullptr;
+    }
+    return &(it->second);
+}
+
+const std::vector<int>* SymbolTable::get_array_maybe(const std::string& name) const {
+    auto it = arrays.find(name);
+    if (it == arrays.end()) {
+        return nullptr;
+    }
+    return &(it->second);
+}
