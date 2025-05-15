@@ -21,10 +21,12 @@ public:
     void print() const; // Added print method
     std::vector<int>* get_array_maybe(const std::string& name); // Non-const version for modification
     const std::vector<int>* get_array_maybe(const std::string& name) const; // Const version
-
+    void set_silent_mode(bool mode);
 private:
     std::map<std::string, int> variables;
     std::map<std::string, std::vector<int>> arrays;
+
+    bool silent_mode_active;
 };
 
 #endif // SYMBOL_TABLE_H

@@ -10,7 +10,7 @@ void Interpreter::set_silent_mode(bool mode) {
     silent_mode_active = mode;
 }
 
-void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал ops в ops_list
+void Interpreter::execute(const std::vector<OPS>& ops_list) { // РџРµСЂРµРёРјРµРЅРѕРІР°Р» ops РІ ops_list
     std::stack<int> stack;
     size_t pc = 0;
 
@@ -27,7 +27,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал op
 
         if (op.operation == "r") {
             int value;
-            std::cout << "Enter value for " << op.operand << ": "; // Оставляем этот вывод
+            std::cout << "Enter value for " << op.operand << ": "; // РћСЃС‚Р°РІР»СЏРµРј СЌС‚РѕС‚ РІС‹РІРѕРґ
             std::cin >> value;
             if (std::cin.fail()) {
                 std::cin.clear();
@@ -40,7 +40,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал op
             }
         }
         else if (op.operation == "") {
-            // ... (логика без изменений, но с if (!silent_mode_active) для cout)
+            // ... (Р»РѕРіРёРєР° Р±РµР· РёР·РјРµРЅРµРЅРёР№, РЅРѕ СЃ if (!silent_mode_active) РґР»СЏ cout)
             if (sym_table.exists(op.operand)) {
                 try {
                     int value = sym_table.get_variable(op.operand);
@@ -65,8 +65,8 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал op
                 }
             }
         }
-        // ... Аналогично для всех остальных операций ...
-        // Пример для '+'
+        // ... РђРЅР°Р»РѕРіРёС‡РЅРѕ РґР»СЏ РІСЃРµС… РѕСЃС‚Р°Р»СЊРЅС‹С… РѕРїРµСЂР°С†РёР№ ...
+        // РџСЂРёРјРµСЂ РґР»СЏ '+'
         else if (op.operation == "+") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for + operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
@@ -76,7 +76,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал op
                 std::cout << "Computed " << left << " + " << right << " = " << (left + right) << "\n";
             }
         }
-        // ... (и так далее для -, *, /, ~, >, <, ==, &, |, !) ...
+        // ... (Рё С‚Р°Рє РґР°Р»РµРµ РґР»СЏ -, *, /, ~, >, <, ==, &, |, !) ...
         else if (op.operation == "-") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for - operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
@@ -228,7 +228,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал op
 
             int search_k_limit = static_cast<int>(pc) - 1;
             for (int k = search_k_limit; k >= 0; --k) {
-                if (k < static_cast<int>(ops_list.size()) && ops_list[k].operation == "alloc_array") { // Проверка границ k
+                if (k < static_cast<int>(ops_list.size()) && ops_list[k].operation == "alloc_array") { // РџСЂРѕРІРµСЂРєР° РіСЂР°РЅРёС† k
                     array_name = ops_list[k].operand;
                     found_alloc = true;
                     break;
@@ -253,7 +253,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал op
             if (stack.empty()) throw std::runtime_error("Stack underflow for array_read index at pc " + std::to_string(pc));
             int index = stack.top(); stack.pop();
             int value;
-            std::cout << "Enter value for " << op.operand << "[" << index << "]: "; // Оставляем этот вывод
+            std::cout << "Enter value for " << op.operand << "[" << index << "]: "; // РћСЃС‚Р°РІР»СЏРµРј СЌС‚РѕС‚ РІС‹РІРѕРґ
             std::cin >> value;
             if (std::cin.fail()) {
                 std::cin.clear();
@@ -289,7 +289,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал op
         else if (op.operation == "w") {
             if (stack.empty()) throw std::runtime_error("Stack is empty for 'w' operation at pc " + std::to_string(pc));
             int value = stack.top(); stack.pop();
-            std::cout << "Output: " << value << "\n"; // Оставляем этот вывод
+            std::cout << "Output: " << value << "\n"; // РћСЃС‚Р°РІР»СЏРµРј СЌС‚РѕС‚ РІС‹РІРѕРґ
         }
         else {
             throw std::runtime_error("Unknown operation: " + op.operation + " at pc " + std::to_string(pc));

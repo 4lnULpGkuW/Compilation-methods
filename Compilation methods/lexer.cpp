@@ -11,7 +11,7 @@ std::vector<Token> Lexer::tokenize() {
     while (pos < input.size()) {
         char c = input[pos];
 
-        // Пропускаем пробелы и табуляцию
+        // РџСЂРѕРїСѓСЃРєР°РµРј РїСЂРѕР±РµР»С‹ Рё С‚Р°Р±СѓР»СЏС†РёСЋ
         if (std::isspace(c)) {
             if (c == '\n') {
                 line++;
@@ -24,11 +24,11 @@ std::vector<Token> Lexer::tokenize() {
             continue;
         }
 
-        // Обработка комментариев
+        // РћР±СЂР°Р±РѕС‚РєР° РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ
         if (c == '/' && pos + 1 < input.size() && input[pos + 1] == '/') {
             pos += 2;
             line_pos += 2;
-            // Пропускаем все символы до конца строки
+            // РџСЂРѕРїСѓСЃРєР°РµРј РІСЃРµ СЃРёРјРІРѕР»С‹ РґРѕ РєРѕРЅС†Р° СЃС‚СЂРѕРєРё
             while (pos < input.size() && input[pos] != '\n') {
                 pos++;
                 line_pos++;
@@ -36,7 +36,7 @@ std::vector<Token> Lexer::tokenize() {
             continue;
         }
 
-        // Ключевые слова и идентификаторы
+        // РљР»СЋС‡РµРІС‹Рµ СЃР»РѕРІР° Рё РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂС‹
         if (std::isalpha(c) || c == '_') {
             std::string word;
             int start_pos = line_pos;
@@ -46,7 +46,7 @@ std::vector<Token> Lexer::tokenize() {
                 line_pos++;
             }
 
-            // Проверка ключевых слов
+            // РџСЂРѕРІРµСЂРєР° РєР»СЋС‡РµРІС‹С… СЃР»РѕРІ
             if (word == "int" || word == "if" || word == "else" ||
                 word == "while" || word == "read" || word == "print") {
                 tokens.emplace_back("KEYWORD", word, line, start_pos);
@@ -57,7 +57,7 @@ std::vector<Token> Lexer::tokenize() {
             continue;
         }
 
-        // Числа
+        // Р§РёСЃР»Р°
         if (std::isdigit(c)) {
             std::string number;
             int start_pos = line_pos;
@@ -70,7 +70,7 @@ std::vector<Token> Lexer::tokenize() {
             continue;
         }
 
-        // Символы
+        // РЎРёРјРІРѕР»С‹
         if (c == '+' || c == '-' || c == '*' || c == '/' ||
             c == '=' || c == '>' || c == '<' || c == '|' ||
             c == '&' || c == '!' || c == '~' || c == '(' ||
@@ -80,7 +80,7 @@ std::vector<Token> Lexer::tokenize() {
             tokens.emplace_back("SYMBOL", symbol, line, line_pos);
             pos++;
             line_pos++;
-            // Проверка на ==
+            // РџСЂРѕРІРµСЂРєР° РЅР° ==
             if (c == '=' && pos < input.size() && input[pos] == '=') {
                 tokens.back().value = "==";
                 pos++;
@@ -89,7 +89,7 @@ std::vector<Token> Lexer::tokenize() {
             continue;
         }
 
-        // Неизвестный символ
+        // РќРµРёР·РІРµСЃС‚РЅС‹Р№ СЃРёРјРІРѕР»
         std::stringstream ss;
         ss << "invalid symbol '" << c << "'";
         throw Error("Lexical error", ss.str(), line, line_pos);

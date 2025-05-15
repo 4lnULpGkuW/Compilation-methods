@@ -9,6 +9,9 @@ void SymbolTable::add_variable(const std::string& name, int value) {
         throw std::runtime_error("Variable or array '" + name + "' already exists");
     }
     variables[name] = value;
+    if (!silent_mode_active) {
+        std::cout << "Added variable: " << name << " = " << value << "\n";
+    }
 }
 
 void SymbolTable::add_array(const std::string& name, int size) {
@@ -16,6 +19,9 @@ void SymbolTable::add_array(const std::string& name, int size) {
         throw std::runtime_error("Variable or array '" + name + "' already exists");
     }
     arrays[name] = std::vector<int>(size, 0);
+    if (!silent_mode_active) {
+        std::cout << "Added array: " << name << " with size " << size << "\n";
+    }
 }
 
 bool SymbolTable::exists(const std::string& name) const {
@@ -71,7 +77,12 @@ void SymbolTable::print() const {
         std::cout << "Variable: " << var.first << ", Value: " << var.second << "\n";
     }
     for (const auto& arr : arrays) {
-        std::cout << "Array: " << arr.first << ", Size: " << arr.second.size() << "\n";
+        std::cout << "Array: " << arr.first << ", Size: " << arr.second.size() << ", Values: [";
+        for (size_t i = 0; i < arr.second.size(); ++i) {
+            std::cout << arr.second[i];
+            if (i < arr.second.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]\n";
     }
 }
 
@@ -89,4 +100,8 @@ const std::vector<int>* SymbolTable::get_array_maybe(const std::string& name) co
         return nullptr;
     }
     return &(it->second);
+}
+
+void SymbolTable::set_silent_mode(bool mode) {
+    silent_mode_active = mode;
 }

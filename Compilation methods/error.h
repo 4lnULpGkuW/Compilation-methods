@@ -9,10 +9,10 @@ public:
     std::string message() const;
 
 private:
-    std::string type;   // Тип ошибки: lexical, syntax, runtime
-    std::string symbol; // Ошибочный символ или токен
-    int line;           // Номер строки
-    int pos;            // Позиция
+    std::string type;   // РўРёРї РѕС€РёР±РєРё: lexical, syntax, runtime
+    std::string symbol; // РћС€РёР±РѕС‡РЅС‹Р№ СЃРёРјРІРѕР» РёР»Рё С‚РѕРєРµРЅ
+    int line;           // РќРѕРјРµСЂ СЃС‚СЂРѕРєРё
+    int pos;            // РџРѕР·РёС†РёСЏ
 };
 
 #endif

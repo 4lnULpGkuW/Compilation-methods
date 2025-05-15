@@ -5,9 +5,9 @@
 
 struct Token {
     std::string type;  // KEYWORD, ID, NUMBER, SYMBOL, EOF
-    std::string value; // Значение токена (например, "int", "a", "42", "+")
-    int line;          // Номер строки
-    int pos;           // Позиция в строке
+    std::string value; // Р—РЅР°С‡РµРЅРёРµ С‚РѕРєРµРЅР° (РЅР°РїСЂРёРјРµСЂ, "int", "a", "42", "+")
+    int line;          // РќРѕРјРµСЂ СЃС‚СЂРѕРєРё
+    int pos;           // РџРѕР·РёС†РёСЏ РІ СЃС‚СЂРѕРєРµ
     Token(const std::string& t, const std::string& v, int l, int p)
         : type(t), value(v), line(l), pos(p) {}
 };
