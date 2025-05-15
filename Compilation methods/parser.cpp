@@ -87,7 +87,6 @@ bool Parser::match_and_advance(const std::string& expected_terminal_in_rule) {
 }
 
 void Parser::initialize_grammar_and_table() {
-    
     grammar_rules = {
         { "Программа", {"СписокОператоров", "EOF"}, 0 },
         { "СписокОператоров", {"Оператор", "СписокОператоров"}, 1 },
@@ -297,13 +296,8 @@ void Parser::initialize_grammar_and_table() {
     ll_parse_table["ЛогИ_Прод"][")"] = 43;
     ll_parse_table["ЛогИ_Прод"][";"] = 43;
     ll_parse_table["ЛогИ_Прод"]["EOF"] = 43;
-
     ll_parse_table["ЛогИ_Прод"]["+"] = 43;
     ll_parse_table["ЛогИ_Прод"]["-"] = 43;
-    ll_parse_table["ЛогИ_Прод"]["|"] = 43;
-    ll_parse_table["ЛогИ_Прод"][")"] = 43;
-    ll_parse_table["ЛогИ_Прод"][";"] = 43;
-    ll_parse_table["ЛогИ_Прод"]["EOF"] = 43;
 
     ll_parse_table["ЛогИ_Терм"]["!"] = 44;
     ll_parse_table["ЛогИ_Терм"]["("] = 45;
@@ -332,88 +326,156 @@ void Parser::initialize_grammar_and_table() {
     ll_parse_table["ОператорСравнения"]["=="] = 52;
 
     ll_parse_table["ДоступКПеременнойДляRead"]["ID"] = 53;
-
-    if (!silent_mode_active) {
-        std::cout << "Parse table initialized.\n";
-    }
 }
 
 std::vector<OPS> Parser::parse(const std::vector<Token>& tokens) {
+    if (tokens.empty()) {
+        throw std::runtime_error("Syntax error at line 1, position 1: empty token list");
+    }
     tokens_list = tokens;
     current_token_idx = 0;
     ops_list.clear();
     while (!parse_stack.empty()) parse_stack.pop();
     while (!label_stack.empty()) label_stack.pop();
     declared_arrays_set.clear();
-    id_for_actions.clear(); number_for_actions.clear(); id_for_lhs.clear(); stored_comparison_operator.clear();
-    current_initializer_count = 0; is_array_access = false;
+    id_for_actions.clear();
+    number_for_actions.clear();
+    id_for_lhs.clear();
+    stored_comparison_operator.clear();
+    saved_array_id.clear();
+    current_initializer_count = 0;
+    is_array_access = false;
 
     parse_stack.push("EOF");
     parse_stack.push("Программа");
 
+    if (!silent_mode_active) {
+        std::cout << "Starting LL(1) parsing with " << tokens_list.size() << " tokens\n";
+    }
+
     while (!parse_stack.empty()) {
-        std::string top = parse_stack.top();
-        Token curr = (current_token_idx < tokens_list.size()) ? tokens_list[current_token_idx] : Token("EOF", "", 0, 0);
-        std::string term = get_current_input_terminal_string(curr);
-        if (!silent_mode_active) std::cout << "Stack: " << top << ", Token: " << term << " ('" << curr.value << "')\n";
-        if (top.rfind("#ACTION", 0) == 0) {
-            parse_stack.pop();
-            execute_action(top);
+        std::string stack_top_symbol = parse_stack.top();
+        Token current_token = (current_token_idx < tokens_list.size()) ? tokens_list[current_token_idx] : Token("EOF", "", 0, 0);
+        std::string current_input_terminal_str = get_current_input_terminal_string(current_token);
+
+        if (!silent_mode_active) {
+            std::cout << "Stack top: " << stack_top_symbol << ", Current token: " << current_input_terminal_str << " ('" << current_token.value << "')\n";
         }
-        else if (!ll_parse_table.count(top)) {
+
+        if (stack_top_symbol.rfind("#ACTION", 0) == 0) {
             parse_stack.pop();
-            if (!match_and_advance(top)) throw std::runtime_error("Unexpected '" + curr.value + "'");
+            execute_action(stack_top_symbol);
+        }
+        else if (ll_parse_table.find(stack_top_symbol) == ll_parse_table.end()) {
+            parse_stack.pop();
+            if (!match_and_advance(stack_top_symbol)) {
+                std::stringstream ss;
+                ss << "Syntax error at line " << current_token.line << ", position " << current_token.pos
+                    << ": expected '" << stack_top_symbol << "' but found '" << current_token.value << "'";
+                throw std::runtime_error(ss.str());
+            }
         }
         else {
-            auto& row = ll_parse_table[top];
-            if (!row.count(term)) throw std::runtime_error("No rule for '" + top + "' and '" + term + "'");
-            int idx = row[term];
-            auto& rule = grammar_rules[idx];
-            parse_stack.pop();
-            if (!silent_mode_active) { std::cout << "Apply rule " << rule.id << "\n"; }
-            for (auto it = rule.rhs.rbegin(); it != rule.rhs.rend(); ++it) if (!it->empty()) parse_stack.push(*it);
+            auto& map_for_nonterminal = ll_parse_table[stack_top_symbol];
+            if (map_for_nonterminal.find(current_input_terminal_str) != map_for_nonterminal.end()) {
+                int rule_idx = map_for_nonterminal[current_input_terminal_str];
+                const auto& rule = grammar_rules[rule_idx];
+                parse_stack.pop();
+
+                if (!silent_mode_active) {
+                    std::cout << "Applying rule " << rule.id << ": " << rule.lhs << " -> ";
+                    for (const auto& sym : rule.rhs) std::cout << sym << " ";
+                    std::cout << "\n";
+                }
+
+                for (auto it = rule.rhs.rbegin(); it != rule.rhs.rend(); ++it) {
+                    if (!it->empty()) {
+                        parse_stack.push(*it);
+                    }
+                }
+            }
+            else {
+                std::string expected_terminals_msg = " Expected: ";
+                for (const auto& pair_item : map_for_nonterminal) {
+                    expected_terminals_msg += pair_item.first + " ";
+                }
+                std::stringstream ss;
+                ss << "Syntax error at line " << current_token.line << ", position " << current_token.pos
+                    << ": no rule for nonterminal '" << stack_top_symbol << "' and token '" << current_token.value << "'."
+                    << expected_terminals_msg;
+                throw std::runtime_error(ss.str());
+            }
         }
     }
-    if (current_token_idx < tokens_list.size() && tokens_list[current_token_idx].type != "EOF")
-        throw std::runtime_error("Extra token '" + tokens_list[current_token_idx].value + "'");
-    if (!silent_mode_active) std::cout << "Parsing done. OPS count=" << ops_list.size() << "\n";
+
+    if (current_token_idx < tokens_list.size() && tokens_list[current_token_idx].type != "EOF") {
+        std::stringstream ss;
+        ss << "Syntax error at line " << tokens_list[current_token_idx].line << ", position " << tokens_list[current_token_idx].pos
+            << ": unexpected token '" << tokens_list[current_token_idx].value << "'";
+        throw std::runtime_error(ss.str());
+    }
+
+    if (!silent_mode_active) {
+        std::cout << "Parsing completed successfully.\n";
+        std::cout << "OPS generated successfully (" << ops_list.size() << " operations):\n";
+        for (size_t i = 0; i < ops_list.size(); ++i) {
+            std::cout << i << ": " << ops_list[i].operation << (ops_list[i].operand.empty() ? "" : " " + ops_list[i].operand) << "\n";
+        }
+    }
+
     return ops_list;
 }
 
 void Parser::execute_action(const std::string& action_symbol) {
+    // Получаем текущий или предыдущий токен для указания строки и позиции в ошибках
+    const Token& token = (current_token_idx > 0 && current_token_idx <= tokens_list.size())
+        ? tokens_list[current_token_idx - 1]
+        : (current_token_idx < tokens_list.size() ? tokens_list[current_token_idx] : Token("EOF", "", 0, 0));
 
-    if (!silent_mode_active) std::cout << "Action: " << action_symbol << " id='" << id_for_actions << "' num='" << number_for_actions << "' arr='" << is_array_access << "'\n";
-   
+    if (!silent_mode_active) {
+        std::cout << "Executing action: " << action_symbol << ", id_for_actions: '" << id_for_actions
+            << "', number_for_actions: '" << number_for_actions << "', is_array_access: '" << is_array_access
+            << "', saved_array_id: '" << saved_array_id << "'\n";
+    }
+
     if (action_symbol == "#ACTION_STORE_ID") {
-        // ID в выражениях
-        if (id_for_actions.empty()) throw std::runtime_error("No ID for STORE_ID");
-        // если сразу после ID скобка — сохраняем имя массива
+        if (id_for_actions.empty()) {
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": no identifier provided for variable or array access";
+            throw std::runtime_error(ss.str());
+        }
         if (current_token_idx < tokens_list.size() && tokens_list[current_token_idx].value == "[") {
             saved_array_id = id_for_actions;
             id_for_actions.clear();
         }
     }
     else if (action_symbol == "#ACTION_STORE_ID_FOR_LHS") {
-        // ID в левой части объявления/присваивания (в том числе read)
-        if (id_for_actions.empty()) throw std::runtime_error("No ID for STORE_ID_FOR_LHS");
-        // тоже проверяем скобку и сохраняем массив
+        if (id_for_actions.empty()) {
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": no identifier provided for left-hand side";
+            throw std::runtime_error(ss.str());
+        }
         if (current_token_idx < tokens_list.size() && tokens_list[current_token_idx].value == "[") {
             saved_array_id = id_for_actions;
-            // не чистим id_for_actions — он понадобится в id_for_lhs
         }
         id_for_lhs = id_for_actions;
     }
-
     else if (action_symbol == "#ACTION_CHECK_VAR_EXISTS") {
         if (!is_variable_declared(id_for_lhs)) {
-            throw std::runtime_error("Undeclared variable or array '" + id_for_lhs + "' at line " +
-                (current_token_idx > 0 ? std::to_string(tokens_list[current_token_idx - 1].line) : "unknown"));
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": undeclared variable or array '" << id_for_lhs << "'";
+            throw std::runtime_error(ss.str());
         }
     }
     else if (action_symbol == "#ACTION_PROCESS_NUMBER") {
         if (number_for_actions.empty()) {
-            throw std::runtime_error("No number stored for #ACTION_PROCESS_NUMBER at line " +
-                (current_token_idx > 0 ? std::to_string(tokens_list[current_token_idx - 1].line) : "unknown"));
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": no number provided for numeric expression";
+            throw std::runtime_error(ss.str());
         }
         add_ops_instruction("", number_for_actions);
         number_for_actions.clear();
@@ -444,7 +506,10 @@ void Parser::execute_action(const std::string& action_symbol) {
     }
     else if (action_symbol == "#ACTION_GEN_COMPARE_OP") {
         if (stored_comparison_operator.empty()) {
-            throw std::runtime_error("ACTION_GEN_COMPARE_OP called without a comparison operator set");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": no comparison operator set for comparison operation";
+            throw std::runtime_error(ss.str());
         }
         add_ops_instruction(stored_comparison_operator);
         stored_comparison_operator.clear();
@@ -460,7 +525,10 @@ void Parser::execute_action(const std::string& action_symbol) {
     }
     else if (action_symbol == "#ACTION_ASSIGN_VAR") {
         if (!is_variable_declared(id_for_lhs)) {
-            throw std::runtime_error("Undeclared variable '" + id_for_lhs + "' in assignment");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": undeclared variable '" << id_for_lhs << "' in assignment";
+            throw std::runtime_error(ss.str());
         }
         add_ops_instruction("=", id_for_lhs);
         id_for_lhs.clear();
@@ -469,7 +537,10 @@ void Parser::execute_action(const std::string& action_symbol) {
     else if (action_symbol == "#ACTION_STORE_SIZE_ID_OR_NUM") {
         if (!id_for_actions.empty()) {
             if (!is_variable_declared(id_for_actions)) {
-                throw std::runtime_error("Array size variable '" + id_for_actions + "' not declared");
+                std::stringstream ss;
+                ss << "Semantic error at line " << token.line << ", position " << token.pos
+                    << ": undeclared variable '" << id_for_actions << "' used as array size";
+                throw std::runtime_error(ss.str());
             }
             add_ops_instruction("", id_for_actions);
             id_for_actions.clear();
@@ -479,12 +550,18 @@ void Parser::execute_action(const std::string& action_symbol) {
             number_for_actions.clear();
         }
         else {
-            throw std::runtime_error("No ID or NUMBER stored for array size for '" + id_for_lhs + "'");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": no identifier or number provided for array size for '" << id_for_lhs << "'";
+            throw std::runtime_error(ss.str());
         }
     }
     else if (action_symbol == "#ACTION_ALLOC_ARRAY") {
         if (is_variable_declared(id_for_lhs)) {
-            throw std::runtime_error("Array or variable '" + id_for_lhs + "' already declared");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": array or variable '" << id_for_lhs << "' already declared";
+            throw std::runtime_error(ss.str());
         }
         add_ops_instruction("alloc_array", id_for_lhs);
         declared_arrays_set.insert(id_for_lhs);
@@ -492,20 +569,27 @@ void Parser::execute_action(const std::string& action_symbol) {
     }
     else if (action_symbol == "#ACTION_SET_ARRAY_ACCESS") {
         if (saved_array_id.empty()) {
-            throw std::runtime_error("No array identifier for #ACTION_SET_ARRAY_ACCESS at line " +
-                (current_token_idx > 0 ? std::to_string(tokens_list[current_token_idx - 1].line) : "unknown"));
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": no array identifier provided for array access";
+            throw std::runtime_error(ss.str());
         }
         is_array_access = true;
         id_for_actions = saved_array_id;
         saved_array_id.clear();
     }
-
     else if (action_symbol == "#ACTION_VAR_OR_ARRAY_GET") {
         if (id_for_actions.empty()) {
-            throw std::runtime_error("No ID for VAR_OR_ARRAY_GET");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": no identifier provided for variable or array access";
+            throw std::runtime_error(ss.str());
         }
         if (!is_variable_declared(id_for_actions)) {
-            throw std::runtime_error("Undeclared variable or array '" + id_for_actions + "'");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": undeclared variable or array '" << id_for_actions << "' in expression";
+            throw std::runtime_error(ss.str());
         }
         if (declared_arrays_set.count(id_for_actions) && is_array_access) {
             add_ops_instruction("array_get", id_for_actions);
@@ -513,17 +597,18 @@ void Parser::execute_action(const std::string& action_symbol) {
         else {
             add_ops_instruction("", id_for_actions);
         }
-        // Reset
         id_for_actions.clear();
         is_array_access = false;
     }
-
     else if (action_symbol == "#ACTION_ARRAY_INDEX_FOR_SET") {
         is_array_access = true;
     }
     else if (action_symbol == "#ACTION_ARRAY_SET") {
         if (!is_variable_declared(id_for_lhs)) {
-            throw std::runtime_error("Undeclared array '" + id_for_lhs + "' in array set operation");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": undeclared array '" << id_for_lhs << "' in array set operation";
+            throw std::runtime_error(ss.str());
         }
         add_ops_instruction("array_set", id_for_lhs);
         id_for_lhs.clear();
@@ -531,7 +616,10 @@ void Parser::execute_action(const std::string& action_symbol) {
     }
     else if (action_symbol == "#ACTION_READ_VAR_OR_ARRAY") {
         if (!is_variable_declared(id_for_lhs)) {
-            throw std::runtime_error("Undeclared variable or array '" + id_for_lhs + "' in read operation");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": undeclared variable or array '" << id_for_lhs << "' in read operation";
+            throw std::runtime_error(ss.str());
         }
         if (declared_arrays_set.count(id_for_lhs) && is_array_access) {
             add_ops_instruction("array_read", id_for_lhs);
@@ -547,14 +635,20 @@ void Parser::execute_action(const std::string& action_symbol) {
     }
     else if (action_symbol == "#ACTION_DECL_SIMPLE") {
         if (is_variable_declared(id_for_lhs)) {
-            throw std::runtime_error("Variable or array '" + id_for_lhs + "' already exists");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": variable or array '" << id_for_lhs << "' already declared";
+            throw std::runtime_error(ss.str());
         }
         sym_table.add_variable(id_for_lhs, 0);
         id_for_lhs.clear();
     }
     else if (action_symbol == "#ACTION_DECL_INIT") {
         if (is_variable_declared(id_for_lhs)) {
-            throw std::runtime_error("Variable or array '" + id_for_lhs + "' already exists");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": variable or array '" << id_for_lhs << "' already declared";
+            throw std::runtime_error(ss.str());
         }
         sym_table.add_variable(id_for_lhs, 0);
         add_ops_instruction("=", id_for_lhs);
@@ -575,7 +669,10 @@ void Parser::execute_action(const std::string& action_symbol) {
     }
     else if (action_symbol == "#ACTION_PROG2") {
         if (label_stack.empty()) {
-            throw std::runtime_error("Label stack underflow in PROG2");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": label stack underflow in else branch";
+            throw std::runtime_error(ss.str());
         }
         size_t jf_target_pos = pop_label_ops_stack();
         push_label_ops_stack(ops_list.size());
@@ -593,7 +690,10 @@ void Parser::execute_action(const std::string& action_symbol) {
     }
     else if (action_symbol == "#ACTION_PROG5") {
         if (label_stack.size() < 2) {
-            throw std::runtime_error("Label stack underflow in PROG5");
+            std::stringstream ss;
+            ss << "Semantic error at line " << token.line << ", position " << token.pos
+                << ": label stack underflow in while loop";
+            throw std::runtime_error(ss.str());
         }
         size_t jf_target_pos = pop_label_ops_stack();
         size_t loop_start_pos = pop_label_ops_stack();
@@ -601,27 +701,75 @@ void Parser::execute_action(const std::string& action_symbol) {
         set_jump_target(jf_target_pos, ops_list.size());
     }
     else {
-        throw std::runtime_error("Unknown semantic action: " + action_symbol);
+        std::stringstream ss;
+        ss << "Semantic error at line " << token.line << ", position " << token.pos
+            << ": unknown semantic action '" << action_symbol << "'";
+        throw std::runtime_error(ss.str());
     }
 }
 
 void Parser::add_ops_instruction(const std::string& op, const std::string& arg) {
-    if (op.empty() && arg.empty()) throw std::runtime_error("Empty OPS");
-    if (!arg.empty() && !isdigit(arg[0]) && op != "alloc_array" && op != "init_array" && !is_variable_declared(arg))
-        throw std::runtime_error("Undeclared in OPS '" + arg + "'");
+    const Token& token = (current_token_idx > 0 && current_token_idx <= tokens_list.size())
+        ? tokens_list[current_token_idx - 1]
+        : (current_token_idx < tokens_list.size() ? tokens_list[current_token_idx] : Token("EOF", "", 0, 0));
+
+    if (op.empty() && arg.empty()) {
+        std::stringstream ss;
+        ss << "Semantic error at line " << token.line << ", position " << token.pos
+            << ": attempt to add empty OPS instruction";
+        throw std::runtime_error(ss.str());
+    }
+    if (!arg.empty() && !isdigit(arg[0]) && op != "alloc_array" && op != "init_array" && !is_variable_declared(arg)) {
+        std::stringstream ss;
+        ss << "Semantic error at line " << token.line << ", position " << token.pos
+            << ": undeclared variable or array '" << arg << "' in OPS instruction";
+        throw std::runtime_error(ss.str());
+    }
     ops_list.emplace_back(op, arg);
-    if (!silent_mode_active) std::cout << "Added OPS: " << op << " " << arg << "\n";
+    if (!silent_mode_active) {
+        std::cout << "Added OPS: " << op << (arg.empty() ? "" : " " + arg) << "\n";
+    }
 }
 
-void Parser::push_label_ops_stack(size_t p) { label_stack.push(p); }
-size_t Parser::pop_label_ops_stack() {
-    if (label_stack.empty()) throw std::runtime_error("Label stack empty");
-    size_t v = label_stack.top(); label_stack.pop(); return v;
+void Parser::push_label_ops_stack(size_t p) {
+    label_stack.push(p);
 }
+
+size_t Parser::pop_label_ops_stack() {
+    const Token& token = (current_token_idx > 0 && current_token_idx <= tokens_list.size())
+        ? tokens_list[current_token_idx - 1]
+        : (current_token_idx < tokens_list.size() ? tokens_list[current_token_idx] : Token("EOF", "", 0, 0));
+
+    if (label_stack.empty()) {
+        std::stringstream ss;
+        ss << "Semantic error at line " << token.line << ", position " << token.pos
+            << ": label stack is empty";
+        throw std::runtime_error(ss.str());
+    }
+    size_t v = label_stack.top();
+    label_stack.pop();
+    return v;
+}
+
 void Parser::set_jump_target(size_t p, size_t t) {
-    if (p >= ops_list.size()) throw std::runtime_error("Invalid jump label");
-    if (ops_list[p].operation != "jf" && ops_list[p].operation != "j")
-        throw std::runtime_error("Not jump instruction at " + std::to_string(p));
+    const Token& token = (current_token_idx > 0 && current_token_idx <= tokens_list.size())
+        ? tokens_list[current_token_idx - 1]
+        : (current_token_idx < tokens_list.size() ? tokens_list[current_token_idx] : Token("EOF", "", 0, 0));
+
+    if (p >= ops_list.size()) {
+        std::stringstream ss;
+        ss << "Semantic error at line " << token.line << ", position " << token.pos
+            << ": invalid jump label position " << p;
+        throw std::runtime_error(ss.str());
+    }
+    if (ops_list[p].operation != "jf" && ops_list[p].operation != "j") {
+        std::stringstream ss;
+        ss << "Semantic error at line " << token.line << ", position " << token.pos
+            << ": attempt to set jump target on non-jump instruction at position " << p;
+        throw std::runtime_error(ss.str());
+    }
     ops_list[p].operand = std::to_string(t);
-    if (!silent_mode_active) std::cout << "Set target " << p << "->" << t << "\n";
+    if (!silent_mode_active) {
+        std::cout << "Set target " << p << "->" << t << "\n";
+    }
 }
