@@ -10,7 +10,7 @@ void Interpreter::set_silent_mode(bool mode) {
     silent_mode_active = mode;
 }
 
-void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переименовал ops в ops_list
+void Interpreter::execute(const std::vector<OPS>& ops_list) {
     std::stack<int> stack;
     size_t pc = 0;
 
@@ -27,7 +27,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переиме�
 
         if (op.operation == "r") {
             int value;
-            std::cout << "Enter value for " << op.operand << ": "; // Оставляем этот вывод
+            std::cout << "Enter value for " << op.operand << ": ";
             std::cin >> value;
             if (std::cin.fail()) {
                 std::cin.clear();
@@ -40,7 +40,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переиме�
             }
         }
         else if (op.operation == "") {
-            // ... (логика без изменений, но с if (!silent_mode_active) для cout)
+
             if (sym_table.exists(op.operand)) {
                 try {
                     int value = sym_table.get_variable(op.operand);
@@ -65,8 +65,7 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переиме�
                 }
             }
         }
-        // ... Аналогично для всех остальных операций ...
-        // Пример для '+'
+
         else if (op.operation == "+") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for + operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
@@ -76,7 +75,6 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переиме�
                 std::cout << "Computed " << left << " + " << right << " = " << (left + right) << "\n";
             }
         }
-        // ... (и так далее для -, *, /, ~, >, <, ==, &, |, !) ...
         else if (op.operation == "-") {
             if (stack.size() < 2) throw std::runtime_error("Stack underflow for - operation at pc " + std::to_string(pc));
             int right = stack.top(); stack.pop();
@@ -146,7 +144,6 @@ void Interpreter::execute(const std::vector<OPS>& ops_list) { // Переиме�
             stack.push(val == 0 ? 1 : 0);
             if (!silent_mode_active) std::cout << "Computed !" << val << " = " << (val == 0 ? 1 : 0) << "\n";
         }
-
         else if (op.operation == "jf") {
             if (op.operand.empty()) throw std::runtime_error("jf missing target operand at pc " + std::to_string(pc));
             if (stack.empty()) throw std::runtime_error("Stack underflow for jf condition at pc " + std::to_string(pc));

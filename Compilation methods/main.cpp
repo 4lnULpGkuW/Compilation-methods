@@ -36,10 +36,10 @@ void run_test(const std::string& filename) {
         std::vector<Token> tokens = lexer.tokenize();
         if (!silent_mode) {
             std::cout << "Tokens generated successfully (" << tokens.size() << " tokens)\n";
-            //std::cout << "Tokens:\n";
-            //for (const auto& t : tokens) {
-            //    std::cout << t.type << " '" << t.value << "' (line " << t.line << ")\n";
-            //}
+            std::cout << "Tokens:\n";
+            for (const auto& t : tokens) {
+                std::cout << t.type << " '" << t.value << "' (line " << t.line << ")\n";
+            }
         }
 
         SymbolTable sym_table;
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
         silent_mode = true;
     }
 
-    silent_mode = true;
+    //silent_mode = true;
     
     std::vector<std::string> test_files = { "test1.txt", "test2.txt", "test3.1.txt", "test3.2.txt", "test3.3.txt", "test4.txt", "test5.txt", "test6.txt" };
     for (const auto& file : test_files) {

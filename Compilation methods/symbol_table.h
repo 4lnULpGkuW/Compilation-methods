@@ -18,9 +18,9 @@ public:
     void set_array_element(const std::string& name, int index, int value);
     const std::map<std::string, int>& get_variables() const;
     void clear();
-    void print() const; // Added print method
-    std::vector<int>* get_array_maybe(const std::string& name); // Non-const version for modification
-    const std::vector<int>* get_array_maybe(const std::string& name) const; // Const version
+    void print() const;
+    std::vector<int>* get_array_maybe(const std::string& name);
+    const std::vector<int>* get_array_maybe(const std::string& name) const;
     void set_silent_mode(bool mode);
 private:
     std::map<std::string, int> variables;
